@@ -1,0 +1,36 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "i-regul connect",
+        "description": "Identifiants de votre installation tels qu'affichés dans l'application i-regul connect (liste des installations).",
+        "data": {
+          "serial": "Numéro de série (SN)",
+          "password": "Mot de passe"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Nouveau mot de passe i-regul",
+        "data": { "password": "Mot de passe" }
+      }
+    },
+    "error": {
+      "invalid_auth": "Mot de passe refusé par le serveur i-regul.",
+      "unknown_serial": "Numéro de série inconnu du serveur i-regul.",
+      "cannot_connect": "Impossible de joindre i-regul.fr (port 443 TCP).",
+      "unknown": "Erreur inattendue."
+    },
+    "abort": {
+      "already_configured": "Cette installation est déjà configurée.",
+      "reauth_successful": "Mot de passe mis à jour."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options i-regul",
+        "data": { "scan_interval": "Intervalle de scrutation (secondes)" }
+      }
+    }
+  }
+}

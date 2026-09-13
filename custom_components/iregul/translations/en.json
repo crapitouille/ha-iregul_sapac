@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "i-regul connect",
+        "description": "Credentials of your installation as shown in the i-regul connect app (installation list).",
+        "data": {
+          "serial": "Serial number (SN)",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "New i-regul password",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Password rejected by the i-regul server.",
+      "unknown_serial": "Serial number unknown to the i-regul server.",
+      "cannot_connect": "Cannot reach i-regul.fr (TCP port 443).",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This installation is already configured.",
+      "reauth_successful": "Password updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "i-regul options",
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        }
+      }
+    }
+  }
+}

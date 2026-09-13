@@ -1,0 +1,447 @@
+# Dashboard « Pompe à chaleur » — intégration i-regul
+# Cartes natives Home Assistant uniquement (aucune dépendance HACS).
+#
+# Installation : Paramètres → Tableaux de bord → Ajouter → (nom au choix) → ouvrir →
+# ⋮ → Modifier → ⋮ → Éditeur de configuration brute → coller ce fichier → Enregistrer.
+#
+# Les identifiants d'entité sont préfixés par le nom de l'appareil : « pompe_a_chaleur_<SN> ».
+# Si votre SN n'est pas 108944, remplacez « pompe_a_chaleur_108944 » partout.
+
+title: Pompe à chaleur
+views:
+  # ───────────────────────────── Vue d'ensemble ─────────────────────────────
+  - title: Vue d'ensemble
+    path: pac
+    icon: mdi:heat-pump
+    type: sections
+    max_columns: 3
+    badges:
+      - type: entity
+        entity: binary_sensor.pompe_a_chaleur_108944_alarme
+        name: Alarme
+        color: red
+        visibility:
+          - condition: state
+            entity: binary_sensor.pompe_a_chaleur_108944_alarme
+            state: "on"
+      - type: entity
+        entity: sensor.pompe_a_chaleur_108944_temperature_exterieure
+        name: Extérieur
+        color: blue
+      - type: entity
+        entity: sensor.pompe_a_chaleur_108944_puissance_absorbee
+        name: Absorbée
+        color: amber
+      - type: entity
+        entity: sensor.pompe_a_chaleur_108944_cop
+        name: COP
+        color: green
+    sections:
+      # ── État ──
+      - type: grid
+        cards:
+          - type: heading
+            heading: État de la PAC
+            heading_style: title
+            icon: mdi:heat-pump-outline
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_etat
+            name: État
+            icon: mdi:heat-pump
+            color: primary
+            grid_options:
+              columns: 12
+          - type: tile
+            entity: binary_sensor.pompe_a_chaleur_108944_compresseur
+            name: Compresseur
+            icon: mdi:engine
+            color: deep-orange
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_vitesse_compresseur
+            name: Vitesse compr.
+            icon: mdi:speedometer
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: binary_sensor.pompe_a_chaleur_108944_eau_chaude_sanitaire
+            name: Production ECS
+            icon: mdi:water-boiler
+            color: cyan
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: binary_sensor.pompe_a_chaleur_108944_circulateur_zone_1
+            name: Circulateur zone 1
+            icon: mdi:pump
+            color: teal
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: binary_sensor.pompe_a_chaleur_108944_appoint_ecs
+            name: Appoint ECS
+            icon: mdi:flash
+            color: red
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: binary_sensor.pompe_a_chaleur_108944_appoint_chauffage
+            name: Appoint chauffage
+            icon: mdi:flash
+            color: red
+            grid_options:
+              columns: 6
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: binary_sensor.pompe_a_chaleur_108944_alarme
+                state: "on"
+            card:
+              type: tile
+              entity: sensor.pompe_a_chaleur_108944_derniere_alarme
+              name: Alarme active
+              icon: mdi:alert
+              color: red
+              tap_action:
+                action: perform-action
+                perform_action: button.press
+                target:
+                  entity_id: button.pompe_a_chaleur_108944_acquitter_l_alarme
+                confirmation:
+                  text: Acquitter l'alarme sur le régulateur ?
+              grid_options:
+                columns: 12
+
+      # ── Pilotage ──
+      - type: grid
+        cards:
+          - type: heading
+            heading: Pilotage
+            heading_style: title
+            icon: mdi:tune
+          - type: thermostat
+            entity: climate.pompe_a_chaleur_108944_zone_1
+            name: Zone 1
+            features:
+              - type: climate-preset-modes
+                style: dropdown
+                preset_modes:
+                  - auto
+                  - comfort
+                  - eco
+                  - away
+              - type: climate-hvac-modes
+                hvac_modes:
+                  - auto
+                  - "off"
+          - type: tile
+            entity: water_heater.pompe_a_chaleur_108944_ecs1
+            name: Eau chaude sanitaire
+            icon: mdi:water-boiler
+            color: cyan
+            state_content:
+              - state
+              - current_temperature
+            features:
+              - type: target-temperature
+              - type: water-heater-operation-modes
+                operation_modes:
+                  - auto
+                  - performance
+                  - eco
+                  - hors_gel
+                  - "off"
+            grid_options:
+              columns: 12
+          - type: tile
+            entity: switch.pompe_a_chaleur_108944_autorisation_chauffage
+            name: Chauffage
+            icon: mdi:radiator
+            color: orange
+            tap_action:
+              action: toggle
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: switch.pompe_a_chaleur_108944_autorisation_rafraichissement
+            name: Rafraîchissement
+            icon: mdi:snowflake
+            color: light-blue
+            tap_action:
+              action: toggle
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: button.pompe_a_chaleur_108944_forcer_un_degivrage
+            name: Forcer un dégivrage
+            icon: mdi:snowflake-melt
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.pompe_a_chaleur_108944_forcer_un_degivrage
+              confirmation:
+                text: Lancer un cycle de dégivrage maintenant ?
+            grid_options:
+              columns: 12
+
+      # ── Températures ──
+      - type: grid
+        cards:
+          - type: heading
+            heading: Températures
+            heading_style: title
+            icon: mdi:thermometer
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_temperature_exterieure
+            name: Extérieure
+            icon: mdi:weather-partly-cloudy
+            color: blue
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_temperature_ecs
+            name: Ballon ECS
+            icon: mdi:water-thermometer
+            color: cyan
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_temperature_ballon_tampon
+            name: Ballon tampon
+            icon: mdi:storage-tank
+            color: teal
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_debit_chauffage
+            name: Débit chauffage
+            icon: mdi:waves-arrow-right
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_temperature_depart_condenseur
+            name: Départ
+            icon: mdi:arrow-up-bold
+            color: red
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_temperature_retour_condenseur
+            name: Retour
+            icon: mdi:arrow-down-bold
+            color: orange
+            grid_options:
+              columns: 6
+          - type: history-graph
+            title: 24 dernières heures
+            hours_to_show: 24
+            entities:
+              - entity: sensor.pompe_a_chaleur_108944_temperature_exterieure
+                name: Extérieure
+              - entity: sensor.pompe_a_chaleur_108944_temperature_ecs
+                name: ECS
+              - entity: sensor.pompe_a_chaleur_108944_temperature_ballon_tampon
+                name: Tampon
+              - entity: sensor.pompe_a_chaleur_108944_temperature_depart_condenseur
+                name: Départ
+              - entity: sensor.pompe_a_chaleur_108944_temperature_retour_condenseur
+                name: Retour
+          - type: history-graph
+            title: Fonctionnement (24 h)
+            hours_to_show: 24
+            entities:
+              - entity: binary_sensor.pompe_a_chaleur_108944_compresseur
+                name: Compresseur
+              - entity: binary_sensor.pompe_a_chaleur_108944_eau_chaude_sanitaire
+                name: ECS
+              - entity: binary_sensor.pompe_a_chaleur_108944_circulateur_zone_1
+                name: Zone 1
+              - entity: binary_sensor.pompe_a_chaleur_108944_appoint_ecs
+                name: Appoint ECS
+              - entity: binary_sensor.pompe_a_chaleur_108944_vanne_inversion
+                name: Dégivrage / inversion
+
+  # ───────────────────────── Énergie & performance ─────────────────────────
+  - title: Énergie
+    path: energie
+    icon: mdi:lightning-bolt
+    type: sections
+    max_columns: 3
+    sections:
+      # ── Instantané ──
+      - type: grid
+        cards:
+          - type: heading
+            heading: Instantané
+            heading_style: title
+            icon: mdi:gauge
+          - type: gauge
+            entity: sensor.pompe_a_chaleur_108944_cop
+            name: COP
+            min: 0
+            max: 6
+            needle: true
+            severity:
+              red: 0
+              yellow: 2
+              green: 3
+            grid_options:
+              columns: 6
+          - type: gauge
+            entity: sensor.pompe_a_chaleur_108944_puissance_absorbee
+            name: Puissance absorbée
+            unit: W
+            min: 0
+            max: 6000
+            needle: true
+            severity:
+              green: 0
+              yellow: 2500
+              red: 4500
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_puissance_calorifique
+            name: Puissance calorifique
+            icon: mdi:fire
+            color: orange
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_puissance_moyenne
+            name: Puissance moyenne
+            icon: mdi:chart-line
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_nombre_demarrages
+            name: Démarrages
+            icon: mdi:counter
+            grid_options:
+              columns: 6
+          - type: tile
+            entity: sensor.pompe_a_chaleur_108944_heures_total_t1
+            name: Heures totales
+            icon: mdi:timer-outline
+            grid_options:
+              columns: 6
+          - type: history-graph
+            title: Puissance absorbée (24 h)
+            hours_to_show: 24
+            entities:
+              - entity: sensor.pompe_a_chaleur_108944_puissance_absorbee
+                name: Absorbée (W)
+          - type: history-graph
+            title: COP (24 h)
+            hours_to_show: 24
+            entities:
+              - entity: sensor.pompe_a_chaleur_108944_cop
+                name: COP
+
+      # ── Consommations ──
+      - type: grid
+        cards:
+          - type: heading
+            heading: Consommation par usage
+            heading_style: title
+            icon: mdi:chart-bar
+          - type: statistics-graph
+            title: Par jour (30 derniers jours)
+            chart_type: bar
+            period: day
+            days_to_show: 30
+            stat_types:
+              - change
+            entities:
+              - entity: sensor.pompe_a_chaleur_108944_conso_chauffage_t1
+                name: Chauffage
+              - entity: sensor.pompe_a_chaleur_108944_conso_ecs_t1
+                name: ECS
+              - entity: sensor.pompe_a_chaleur_108944_conso_rafraichissement_t1
+                name: Rafraîchissement
+              - entity: sensor.pompe_a_chaleur_108944_conso_degivrage_t1
+                name: Dégivrage
+          - type: statistics-graph
+            title: Par mois (12 derniers mois)
+            chart_type: bar
+            period: month
+            days_to_show: 365
+            stat_types:
+              - change
+            entities:
+              - entity: sensor.pompe_a_chaleur_108944_conso_chauffage_t1
+                name: Chauffage
+              - entity: sensor.pompe_a_chaleur_108944_conso_ecs_t1
+                name: ECS
+              - entity: sensor.pompe_a_chaleur_108944_conso_rafraichissement_t1
+                name: Rafraîchissement
+          - type: statistic
+            entity: sensor.pompe_a_chaleur_108944_conso_total_t1
+            name: Total ce mois
+            stat_type: change
+            period:
+              calendar:
+                period: month
+            grid_options:
+              columns: 6
+          - type: statistic
+            entity: sensor.pompe_a_chaleur_108944_conso_total_t1
+            name: Total cette année
+            stat_type: change
+            period:
+              calendar:
+                period: year
+            grid_options:
+              columns: 6
+
+      # ── Compteurs cumulés ──
+      - type: grid
+        cards:
+          - type: heading
+            heading: Compteurs cumulés
+            heading_style: title
+            icon: mdi:counter
+          - type: entities
+            title: Énergie (kWh)
+            state_color: false
+            entities:
+              - entity: sensor.pompe_a_chaleur_108944_conso_total_t1
+                name: Total
+                icon: mdi:sigma
+              - entity: sensor.pompe_a_chaleur_108944_conso_chauffage_t1
+                name: Chauffage
+                icon: mdi:radiator
+              - entity: sensor.pompe_a_chaleur_108944_conso_ecs_t1
+                name: Eau chaude sanitaire
+                icon: mdi:water-boiler
+              - entity: sensor.pompe_a_chaleur_108944_conso_rafraichissement_t1
+                name: Rafraîchissement
+                icon: mdi:snowflake
+              - entity: sensor.pompe_a_chaleur_108944_conso_degivrage_t1
+                name: Dégivrage
+                icon: mdi:snowflake-melt
+              - entity: sensor.pompe_a_chaleur_108944_conso_divers_t1
+                name: Divers
+                icon: mdi:dots-horizontal
+              - entity: sensor.pompe_a_chaleur_108944_conso_compteur_1_t1
+                name: Compteur externe 1
+                icon: mdi:meter-electric
+          - type: entities
+            title: Heures de fonctionnement
+            entities:
+              - entity: sensor.pompe_a_chaleur_108944_heures_total_t1
+                name: Total
+              - entity: sensor.pompe_a_chaleur_108944_heures_chauffage_t1
+                name: Chauffage
+              - entity: sensor.pompe_a_chaleur_108944_heures_ecs_t1
+                name: ECS
+              - entity: sensor.pompe_a_chaleur_108944_heures_rafraichissement_t1
+                name: Rafraîchissement
+              - entity: sensor.pompe_a_chaleur_108944_heures_degivrage_t1
+                name: Dégivrage
+              - entity: sensor.pompe_a_chaleur_108944_heures_appoint_t1
+                name: Appoint chauffage
+              - entity: sensor.pompe_a_chaleur_108944_heures_appoint_ecs_t1
+                name: Appoint ECS
