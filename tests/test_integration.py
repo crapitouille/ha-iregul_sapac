@@ -200,4 +200,4 @@ async def test_config_flow(hass: HomeAssistant, fake_server) -> None:
         result["flow_id"], {CONF_SERIAL: "108944", CONF_PASSWORD: "secret"}
     )
     assert result["type"] == "create_entry"
-    assert result["title"] == "i-regul 108944"
+    assert result["title"] == "WattKeeper - i-regul 108944"

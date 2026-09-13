@@ -1,5 +1,5 @@
 {
-  "name": "i-regul (SAPAC heat pump)",
+  "name": "WattKeeper - i-regul",
   "render_readme": true,
   "homeassistant": "2024.12.0"
 }

@@ -20,7 +20,7 @@ SAPAC ; à utiliser à vos risques.
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=crapitouille&repository=ha-iregul_sapac&category=integration)
 
-Puis, dans HACS, cliquer sur **i-regul (SAPAC heat pump)** → **Télécharger**, et **redémarrer
+Puis, dans HACS, cliquer sur **WattKeeper - i-regul** → **Télécharger**, et **redémarrer
 Home Assistant**.
 
 **2. Ajouter l'intégration :**
@@ -58,14 +58,14 @@ Voir « Installation en un clic » ci-dessus.
 ### HACS — dépôt personnalisé (manuel)
 1. HACS → ⋮ (en haut à droite) → *Dépôts personnalisés*.
 2. URL : `https://github.com/crapitouille/ha-iregul_sapac`, catégorie *Intégration*.
-3. Installer **i-regul (SAPAC heat pump)**, redémarrer Home Assistant.
+3. Installer **WattKeeper - i-regul**, redémarrer Home Assistant.
 
 ### Sans HACS
 Copier le dossier `custom_components/iregul` dans `config/custom_components/` puis redémarrer.
 
 ## Configuration
 
-Paramètres → Appareils et services → *Ajouter une intégration* → **i-regul**, puis saisir :
+Paramètres → Appareils et services → *Ajouter une intégration* → **WattKeeper - i-regul**, puis saisir :
 
 - **Numéro de série (SN)** : visible dans i-regul connect (liste des installations) — 6 chiffres.
 - **Mot de passe** : celui de l'installation dans i-regul connect.

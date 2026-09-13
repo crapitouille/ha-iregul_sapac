@@ -1,6 +1,6 @@
 {
   "domain": "iregul",
-  "name": "i-regul (SAPAC heat pump)",
+  "name": "WattKeeper - i-regul",
   "codeowners": ["@crapitouille"],
   "config_flow": true,
   "dependencies": [],
@@ -9,5 +9,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/crapitouille/ha-iregul_sapac/issues",
   "requirements": [],
-  "version": "0.1.2"
+  "version": "0.1.3"
 }

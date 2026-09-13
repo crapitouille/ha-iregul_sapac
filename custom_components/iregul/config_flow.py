@@ -72,7 +72,7 @@ class IRegulConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
             else:
                 return self.async_create_entry(
-                    title=f"i-regul {serial}",
+                    title=f"WattKeeper - i-regul {serial}",
                     data={CONF_SERIAL: serial, CONF_PASSWORD: user_input[CONF_PASSWORD]},
                 )
         return self.async_show_form(
