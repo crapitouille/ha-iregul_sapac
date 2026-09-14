@@ -35,6 +35,16 @@ ZONE_HEATING_LAST = 30
 ZONE_ECS2 = 31
 ZONE_ECS3 = 32
 
+# Consigne ECS maximale.
+#
+# Le régulateur publie un champ `Z@<id>&temperature_max` (57 sur une Mistral
+# Compact), mais l'application officielle l'ignore complètement pour l'édition :
+# elle ne s'en sert que pour l'affichage du tableau « pro ». Son écran ECS borne
+# les consignes normal/réduit à une plage FIXE 30–60 °C
+# (`_affichage_layout_zones`, cas 2 : `_b4xseekbar_normal._maxvalue = 60`).
+# On reprend donc la même limite haute, élargie si le régulateur annonce plus.
+ECS_SETPOINT_MAX = 60.0
+
 # Sortie « circulateur zone n » = O@(100 + 10*n)
 def heating_zone_circulator(zone_id: int) -> int:
     """Identifiant de la sortie circulateur d'une zone de chauffage (11 -> 110)."""

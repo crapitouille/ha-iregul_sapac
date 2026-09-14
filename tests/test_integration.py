@@ -20,6 +20,9 @@ from homeassistant.components.water_heater import (
 from homeassistant.components.water_heater import (
     DOMAIN as WH_DOMAIN,
 )
+from homeassistant.components.water_heater import (
+    SERVICE_SET_TEMPERATURE as WH_SERVICE_SET_TEMPERATURE,
+)
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -103,6 +106,10 @@ async def test_setup_and_entities(hass: HomeAssistant, fake_server) -> None:
     assert wh.state == "auto"
     assert wh.attributes["current_temperature"] == 49.6
     assert wh.attributes["temperature"] == 55.0
+    # Le régulateur annonce temperature_max=57 pour Z@1, mais l'application
+    # officielle borne l'ECS à 60 °C : on suit l'application.
+    assert wh.attributes["max_temp"] == 60.0
+    assert wh.attributes["min_temp"] == 5.0
 
     assert hass.states.get("switch.pompe_a_chaleur_108944_autorisation_chauffage").state == "off"
     assert hass.states.get("switch.pompe_a_chaleur_108944_autorisation_rafraichissement").state == "on"
@@ -178,6 +185,23 @@ async def test_set_temperature_and_modes(hass: HomeAssistant, fake_server) -> No
         blocking=True,
     )
     assert fake_server.commands[0] == "{202#}"
+
+
+async def test_ecs_setpoint_60_accepted(hass: HomeAssistant, fake_server) -> None:
+    """La consigne ECS peut monter à 60 °C comme dans l'application officielle."""
+    await _setup(hass)
+    fake_server.commands.clear()
+    await hass.services.async_call(
+        WH_DOMAIN,
+        WH_SERVICE_SET_TEMPERATURE,
+        {ATTR_ENTITY_ID: "water_heater.pompe_a_chaleur_108944_ecs1", ATTR_TEMPERATURE: 60},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    assert fake_server.commands[0] == (
+        "{11#DT_zones@1&consigne_normal[60]#DT_zones@1&consigne_reduit[55]"
+        "#DT_zones@1&consigne_horsgel[10]#DT_zones@1&mode_select[0]}"
+    )
 
 
 async def test_bad_password(hass: HomeAssistant, fake_server) -> None:

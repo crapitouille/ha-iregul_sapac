@@ -79,6 +79,10 @@ Option : intervalle de scrutation (défaut 120 s, minimum 30 s). Une seule comma
   par le protocole officiel, les identifiants transitent en clair — comme avec l'application.
 - Si le régulateur est hors ligne, le serveur renvoie de vieilles données (`OLD`) : les entités
   passent *indisponibles* et un avertissement est journalisé.
+- **Consigne ECS** : le régulateur publie un champ `temperature_max` (57 °C sur une Mistral
+  Compact) que l'application officielle **ignore** pour l'édition — son écran ECS utilise une
+  plage fixe 30–60 °C. L'intégration suit l'application et autorise donc jusqu'à **60 °C**
+  (au-delà si le régulateur annonce plus). C'est in fine le régulateur qui valide la consigne.
 - Les zones n'ont pas de sonde d'ambiance par défaut (régulation par courbe de chauffe) : l'entité
   climate n'affiche pas de température courante ; la consigne calculée est dans les attributs.
 

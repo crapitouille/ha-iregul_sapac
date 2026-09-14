@@ -15,7 +15,7 @@ from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import ZONE_ECS1, ZONE_ECS2, ZONE_ECS3, ZONE_MODES
+from .const import ECS_SETPOINT_MAX, ZONE_ECS1, ZONE_ECS2, ZONE_ECS3, ZONE_MODES
 from .coordinator import IRegulConfigEntry, IRegulCoordinator, IRegulData
 from .entity import IRegulEntity
 from .zone import (
@@ -98,8 +98,13 @@ class IRegulWaterHeater(IRegulEntity, WaterHeaterEntity):
         self._attr_entity_registry_enabled_default = enabled
         self._temp_sensor = _find_temp_sensor(data, zone_id)
         _, self._prod_output, self._boost_output = _ECS_POINTS[zone_id]
+        # Le minimum reste celui du régulateur : il doit rester assez bas pour
+        # couvrir la consigne hors-gel, que cette entité expose en mode away.
         self._attr_min_temp = data.meta.get_float("Z", zone_id, "temperature_min") or 10.0
-        self._attr_max_temp = data.meta.get_float("Z", zone_id, "temperature_max") or 65.0
+        # Le maximum suit l'application officielle (60 °C), pas le
+        # `temperature_max` du régulateur — voir ECS_SETPOINT_MAX.
+        reported_max = data.meta.get_float("Z", zone_id, "temperature_max") or 0.0
+        self._attr_max_temp = max(ECS_SETPOINT_MAX, reported_max)
 
     @property
     def _state(self) -> ZoneState | None:
