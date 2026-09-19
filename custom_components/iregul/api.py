@@ -14,6 +14,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,8 +29,17 @@ DEFAULT_TIMEOUT = 60.0
 # qu'une en vol. On impose donc un intervalle minimal entre deux connexions et on
 # réessaie les lectures en cas de reset transitoire.
 MIN_REQUEST_INTERVAL = 2.0
-MAX_ATTEMPTS = 4
 RETRY_BACKOFF = 2.0
+
+# Deux régimes d'échec, avec des coûts très différents :
+#  - reset / trame incomplète : le serveur répond tout de suite, réessayer est
+#    quasi gratuit et règle le rate-limit ;
+#  - délai dépassé : la connexion est restée muette DEFAULT_TIMEOUT secondes ;
+#    insister coûte très cher (un cycle de scrutation dépasserait l'intervalle)
+#    et aboutit rarement. Pour référence, l'application officielle abandonne une
+#    écriture de zone au bout de 35 ticks de 500 ms, soit 17,5 s seulement.
+MAX_ATTEMPTS = 4
+MAX_TIMEOUT_ATTEMPTS = 2
 
 ITEM_RE = re.compile(r"#(\w+)@(\d+)&([^\[#]+)\[(.*?)\]")
 HEADERS = ("PWD", "SNI", "OLD", "MES")
@@ -64,6 +75,15 @@ class IRegulUnknownSerialError(IRegulError):
 
 class IRegulConnectionError(IRegulError):
     """Impossible de joindre le serveur ou réponse incomplète."""
+
+
+class IRegulTimeoutError(IRegulConnectionError):
+    """Le serveur a accepté la connexion mais n'a pas répondu à temps.
+
+    Attention : `TimeoutError` est une sous-classe d'`OSError` et son `str()`
+    est vide — il faut donc l'intercepter AVANT `OSError` et fournir soi-même
+    un message, sans quoi l'erreur remonte sans aucun texte.
+    """
 
 
 PointKey = tuple[str, int]
@@ -165,11 +185,29 @@ class IRegulClient:
         self._timeout = timeout
         self._lock = asyncio.Lock()
         self._last_request = 0.0
+        self._max_attempts = MAX_ATTEMPTS
+        self._max_timeout_attempts = MAX_TIMEOUT_ATTEMPTS
 
     @property
     def serial(self) -> str:
         """Numéro de série de l'installation."""
         return self._serial
+
+    @contextmanager
+    def fail_fast(self) -> Iterator[None]:
+        """Réduit les réessais le temps d'un bloc.
+
+        Utilisé au démarrage de Home Assistant : insister pendant plusieurs
+        minutes bloquerait le démarrage, alors que renvoyer ConfigEntryNotReady
+        laisse HA réessayer plus tard avec son propre backoff. On garde un
+        réessai « gratuit » (reset/rate-limit) mais une seule longue attente.
+        """
+        previous = (self._max_attempts, self._max_timeout_attempts)
+        self._max_attempts, self._max_timeout_attempts = 2, 1
+        try:
+            yield
+        finally:
+            self._max_attempts, self._max_timeout_attempts = previous
 
     async def _throttle(self) -> None:
         """Impose un intervalle minimal depuis la dernière connexion."""
@@ -202,11 +240,19 @@ class IRegulClient:
                     # un éventuel « \r » peuvent arriver dans des paquets séparés.
                     if b"".join(chunks).rstrip(b"\r\n").endswith(b"}"):
                         break
-        except (OSError, asyncio.TimeoutError) as err:
+        except TimeoutError as err:
+            # À intercepter AVANT OSError (TimeoutError en hérite) et son str()
+            # est vide : sans message explicite l'erreur remonterait nue.
+            if not (chunks and b"".join(chunks).rstrip(b"\r\n").endswith(b"}")):
+                received = sum(len(c) for c in chunks)
+                detail = f" ({received} octets reçus)" if received else ""
+                raise IRegulTimeoutError(
+                    f"Pas de réponse du serveur i-regul après "
+                    f"{self._timeout:.0f} s{detail}"
+                ) from err
+        except OSError as err:
             # Trame déjà complète malgré un reset tardif : on l'accepte.
-            if chunks and b"".join(chunks).rstrip(b"\r\n").endswith(b"}"):
-                pass
-            else:
+            if not (chunks and b"".join(chunks).rstrip(b"\r\n").endswith(b"}")):
                 raise IRegulConnectionError(
                     f"Connexion i-regul impossible : {err}"
                 ) from err
@@ -229,13 +275,18 @@ class IRegulClient:
         (reset, ou réponse incomplète). `retry=False` pour une écriture (elle
         peut avoir été appliquée malgré le reset : on ne la rejoue pas) ;
         `require_frame=False` accepte une réponse vide (écritures).
+
+        Les délais dépassés sont plafonnés à MAX_TIMEOUT_ATTEMPTS : chacun coûte
+        DEFAULT_TIMEOUT secondes, et enchaîner quatre attentes ferait durer un
+        cycle de scrutation plus longtemps que l'intervalle lui-même.
         """
         if not (command.startswith("{") and command.endswith("}")):
             raise ValueError("La commande doit être de la forme {code#...}")
         message = f"cdraminfo{self._serial}{self._password}{command}".encode()
-        attempts = MAX_ATTEMPTS if retry else 1
+        attempts = max(1, self._max_attempts if retry else 1)
         async with self._lock:
             last_err: IRegulConnectionError | None = None
+            timeouts = 0
             for attempt in range(1, attempts + 1):
                 await self._throttle()
                 _LOGGER.debug("i-regul -> %s (tentative %d/%d)", command, attempt, attempts)
@@ -250,6 +301,15 @@ class IRegulClient:
                 except IRegulConnectionError as err:
                     last_err = err
                     self._last_request = asyncio.get_running_loop().time()
+                    if isinstance(err, IRegulTimeoutError):
+                        timeouts += 1
+                        if timeouts >= self._max_timeout_attempts:
+                            _LOGGER.debug(
+                                "i-regul : %s — abandon après %d délai(s) dépassé(s)",
+                                err,
+                                timeouts,
+                            )
+                            raise
                     if attempt < attempts:
                         backoff = RETRY_BACKOFF * attempt
                         _LOGGER.debug(

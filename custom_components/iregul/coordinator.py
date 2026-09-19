@@ -9,7 +9,7 @@ from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -19,6 +19,7 @@ from .api import (
     IRegulConnectionError,
     IRegulError,
     IRegulFrame,
+    IRegulTimeoutError,
     IRegulUnknownSerialError,
     PointKey,
 )
@@ -112,11 +113,15 @@ class IRegulCoordinator(DataUpdateCoordinator[IRegulData]):
         )
         self.client = client
         self._meta: IRegulFrame | None = None
+        self._started = False
 
     async def _async_setup(self) -> None:
         """Découverte initiale (commande 502) — libellés, unités, bornes."""
         try:
-            self._meta = await self.client.async_discover()
+            # Démarrage de HA : on échoue vite plutôt que de le faire patienter
+            # plusieurs minutes quand le serveur i-regul est lent.
+            with self.client.fail_fast():
+                self._meta = await self.client.async_discover()
         except IRegulAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except IRegulUnknownSerialError as err:
@@ -134,11 +139,18 @@ class IRegulCoordinator(DataUpdateCoordinator[IRegulData]):
         """Lecture de l'état courant (commande 10)."""
         assert self._meta is not None
         try:
-            status = await self.client.async_status()
+            if self._started:
+                status = await self.client.async_status()
+            else:
+                # Première lecture : idem, ConfigEntryNotReady et HA réessaiera.
+                with self.client.fail_fast():
+                    status = await self.client.async_status()
         except (IRegulAuthError, IRegulUnknownSerialError) as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except IRegulConnectionError as err:
             raise UpdateFailed(str(err)) from err
+        finally:
+            self._started = True
         if status.stale:
             _LOGGER.warning(
                 "i-regul %s : le serveur renvoie de vieilles données (régulateur hors ligne ?)",
@@ -154,8 +166,16 @@ class IRegulCoordinator(DataUpdateCoordinator[IRegulData]):
             await coro
         except (IRegulAuthError, IRegulUnknownSerialError) as err:
             raise ConfigEntryAuthFailed(str(err)) from err
+        except IRegulTimeoutError as err:
+            # L'écriture n'est jamais rejouée : le serveur a pu l'appliquer sans
+            # que sa confirmation nous parvienne. On le dit clairement plutôt
+            # que de laisser croire à un échec net.
+            raise HomeAssistantError(
+                f"{err}. La commande a peut-être été appliquée malgré tout : "
+                "vérifiez la valeur après le prochain rafraîchissement."
+            ) from err
         except IRegulError as err:
-            raise UpdateFailed(str(err)) from err
+            raise HomeAssistantError(f"Commande i-regul refusée : {err}") from err
         await self.async_request_refresh()
 
     @property
