@@ -6,13 +6,24 @@ from homeassistant.const import CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 
 from .api import IRegulClient
-from .const import CONF_SCAN_INTERVAL, CONF_SERIAL, DEFAULT_SCAN_INTERVAL, PLATFORMS
+from .const import (
+    CONF_SCAN_INTERVAL,
+    CONF_SERIAL,
+    CONF_TIMEOUT,
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_TIMEOUT,
+    PLATFORMS,
+)
 from .coordinator import IRegulConfigEntry, IRegulCoordinator
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: IRegulConfigEntry) -> bool:
     """Configure l'installation à partir d'une entrée de configuration."""
-    client = IRegulClient(entry.data[CONF_SERIAL], entry.data[CONF_PASSWORD])
+    client = IRegulClient(
+        entry.data[CONF_SERIAL],
+        entry.data[CONF_PASSWORD],
+        timeout=float(entry.options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)),
+    )
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = IRegulCoordinator(hass, entry, client, scan_interval)
     await coordinator.async_config_entry_first_refresh()

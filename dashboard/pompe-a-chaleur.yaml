@@ -155,6 +155,38 @@ views:
             grid_options:
               columns: 12
           - type: tile
+            entity: water_heater.pompe_a_chaleur_108944_appoint_ecs
+            name: Appoint électrique ECS
+            icon: mdi:water-boiler-alert
+            color: red
+            state_content:
+              - state
+              - temperature
+            features:
+              - type: target-temperature
+              - type: water-heater-operation-modes
+                operation_modes:
+                  - auto
+                  - performance
+                  - eco
+                  - "off"
+            grid_options:
+              columns: 12
+          - type: markdown
+            content: >-
+              {% set wh = 'water_heater.pompe_a_chaleur_108944_ecs1' %}
+              {% set t = state_attr(wh, 'current_temperature') %}
+              {% set s = state_attr(wh, 'seuil_relance_estime') %}
+              {% set m = state_attr(wh, 'temperature_max_pac') %}
+              {% if s is not none and t is not none %}
+              La PAC chauffe l'ECS jusqu'à **{{ '%g' | format(m) }} °C** et relance sous **{{ '%g' | format(s) }} °C**
+              (ballon à {{ t }} °C :
+              {{ 'production attendue' if t < s else 'pas de relance tant qu\'il reste au-dessus' }}).
+              Au-delà de {{ '%g' | format(m) }} °C, c'est l'**appoint électrique** qui chauffe.
+              {% endif %}
+            grid_options:
+              columns: 12
+          - type: tile
             entity: switch.pompe_a_chaleur_108944_autorisation_chauffage
             name: Chauffage
             icon: mdi:radiator

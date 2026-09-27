@@ -32,7 +32,8 @@
       "init": {
         "title": "i-regul options",
         "data": {
-          "scan_interval": "Polling interval (seconds)"
+          "scan_interval": "Polling interval (seconds)",
+          "timeout": "Response timeout (seconds)"
         }
       }
     }

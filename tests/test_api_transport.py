@@ -7,7 +7,13 @@ import struct
 
 import pytest
 
-from custom_components.iregul.api import IRegulClient, IRegulConnectionError
+from custom_components.iregul.api import (
+    MAX_ATTEMPTS,
+    MAX_TIMEOUT_ATTEMPTS,
+    IRegulClient,
+    IRegulConnectionError,
+    IRegulTimeoutError,
+)
 
 
 async def _serve_once(payload: bytes, *, split_tail: bool, rst: bool) -> tuple[str, int, asyncio.AbstractServer]:
@@ -131,3 +137,59 @@ async def test_reset_without_data_is_not_valid(socket_enabled, monkeypatch) -> N
         except IRegulConnectionError:
             return
         assert not frame.points
+
+
+async def _silent_server() -> tuple[int, asyncio.AbstractServer, dict]:
+    """Serveur qui accepte la connexion puis ne répond jamais (cas du log réel)."""
+    calls = {"n": 0}
+
+    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.read(4096)
+        calls["n"] += 1
+        await asyncio.sleep(1.0)  # bien au-delà du timeout court des tests (0,3 s)
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0)
+    return server.sockets[0].getsockname()[1], server, calls
+
+
+async def test_timeout_has_readable_message(socket_enabled, monkeypatch) -> None:
+    """Un délai dépassé porte un message explicite, pas une chaîne vide.
+
+    `TimeoutError` hérite d'`OSError` et son `str()` est vide : sans traitement
+    dédié l'utilisateur voyait « Connexion i-regul impossible :  ».
+    """
+    monkeypatch.setattr("custom_components.iregul.api.MIN_REQUEST_INTERVAL", 0.0)
+    monkeypatch.setattr("custom_components.iregul.api.RETRY_BACKOFF", 0.0)
+    port, server, _ = await _silent_server()
+    async with server:
+        client = IRegulClient("108944", "secret", host="127.0.0.1", port=port, timeout=0.3)
+        with pytest.raises(IRegulTimeoutError) as excinfo:
+            await client.async_status()
+    message = str(excinfo.value)
+    assert message.strip()
+    assert "Pas de réponse" in message
+
+
+async def test_timeouts_are_not_retried_indefinitely(socket_enabled, monkeypatch) -> None:
+    """Au plus MAX_TIMEOUT_ATTEMPTS attentes longues, même si MAX_ATTEMPTS est plus élevé."""
+    monkeypatch.setattr("custom_components.iregul.api.MIN_REQUEST_INTERVAL", 0.0)
+    monkeypatch.setattr("custom_components.iregul.api.RETRY_BACKOFF", 0.0)
+    port, server, calls = await _silent_server()
+    async with server:
+        client = IRegulClient("108944", "secret", host="127.0.0.1", port=port, timeout=0.3)
+        with pytest.raises(IRegulTimeoutError):
+            await client.async_status()
+    assert calls["n"] == MAX_TIMEOUT_ATTEMPTS
+    assert calls["n"] < MAX_ATTEMPTS  # les timeouts ne consomment pas tous les essais
+
+
+async def test_fail_fast_allows_a_single_timeout(socket_enabled, monkeypatch) -> None:
+    """Au démarrage de HA, une seule longue attente avant d'abandonner."""
+    monkeypatch.setattr("custom_components.iregul.api.MIN_REQUEST_INTERVAL", 0.0)
+    monkeypatch.setattr("custom_components.iregul.api.RETRY_BACKOFF", 0.0)
+    port, server, calls = await _silent_server()
+    async with server:
+        client = IRegulClient("108944", "secret", host="127.0.0.1", port=port, timeout=0.3)
+        with client.fail_fast(), pytest.raises(IRegulTimeoutError):
+            await client.async_status()
+    assert calls["n"] == 1

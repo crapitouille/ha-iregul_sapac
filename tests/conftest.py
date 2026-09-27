@@ -28,11 +28,15 @@ class FakeIRegulServer:
         self.commands: list[str] = []
         self.status = (FIXTURES / "frame_10.txt").read_text(encoding="utf-8")
         self.discover = (FIXTURES / "frame_502.txt").read_text(encoding="utf-8")
+        self.fail = False  # simule une absence du serveur
         self.server: asyncio.AbstractServer | None = None
         self.port = 0
 
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         data = await reader.read(4096)
+        if self.fail:
+            writer.close()  # connexion coupée sans réponse
+            return
         msg = data.decode()
         prefix = f"cdraminfo{self.serial}"
         if not msg.startswith(prefix):

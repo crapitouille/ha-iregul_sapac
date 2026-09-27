@@ -24,9 +24,13 @@ from .api import (
 from .const import (
     CONF_SCAN_INTERVAL,
     CONF_SERIAL,
+    CONF_TIMEOUT,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_TIMEOUT,
     DOMAIN,
+    MAX_TIMEOUT,
     MIN_SCAN_INTERVAL,
+    MIN_TIMEOUT,
 )
 
 STEP_USER_SCHEMA = vol.Schema(
@@ -122,14 +126,19 @@ class IRegulOptionsFlow(OptionsFlow):
         """Formulaire d'options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
-        current = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        options = self.config_entry.options
+        interval = options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        timeout = options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_SCAN_INTERVAL, default=current): vol.All(
+                    vol.Required(CONF_SCAN_INTERVAL, default=interval): vol.All(
                         vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL, max=3600)
-                    )
+                    ),
+                    vol.Required(CONF_TIMEOUT, default=timeout): vol.All(
+                        vol.Coerce(int), vol.Range(min=MIN_TIMEOUT, max=MAX_TIMEOUT)
+                    ),
                 }
             ),
         )

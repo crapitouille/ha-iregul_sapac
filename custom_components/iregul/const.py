@@ -18,8 +18,23 @@ PLATFORMS: list[Platform] = [
 CONF_SERIAL = "serial"
 CONF_SCAN_INTERVAL = "scan_interval"
 
-DEFAULT_SCAN_INTERVAL = 120
+# L'application officielle ne rafraîchit qu'une fois par heure
+# (`_delay_refresh = 3600000 / nb_installations` ms). 300 s reste 12× plus
+# réactif tout en ménageant un serveur qui répond parfois en 40 s.
+DEFAULT_SCAN_INTERVAL = 300
 MIN_SCAN_INTERVAL = 30
+
+CONF_TIMEOUT = "timeout"
+DEFAULT_TIMEOUT = 60
+MIN_TIMEOUT = 15
+MAX_TIMEOUT = 300
+
+# Le serveur i-regul a des absences. Un échec isolé ne doit pas faire clignoter
+# toutes les entités en « indisponible » : on conserve les dernières valeurs
+# connues pendant quelques cycles, puis on devient honnête.
+TOLERATED_FAILURES = 2
+# Et on espace les interrogations tant que ça échoue, plutôt que d'insister.
+MAX_BACKOFF_FACTOR = 4
 
 MANUFACTURER = "i-regul / SAPAC"
 
@@ -35,15 +50,15 @@ ZONE_HEATING_LAST = 30
 ZONE_ECS2 = 31
 ZONE_ECS3 = 32
 
-# Consigne ECS maximale.
+# Paramètres installateur (P@) qui gouvernent la production ECS par la PAC.
 #
-# Le régulateur publie un champ `Z@<id>&temperature_max` (57 sur une Mistral
-# Compact), mais l'application officielle l'ignore complètement pour l'édition :
-# elle ne s'en sert que pour l'affichage du tableau « pro ». Son écran ECS borne
-# les consignes normal/réduit à une plage FIXE 30–60 °C
-# (`_affichage_layout_zones`, cas 2 : `_b4xseekbar_normal._maxvalue = 60`).
-# On reprend donc la même limite haute, élargie si le régulateur annonce plus.
-ECS_SETPOINT_MAX = 60.0
+# Le régulateur ne relance la production que lorsque le ballon descend sous
+# « consigne effective − hystérésis », et la consigne effective de la PAC est
+# plafonnée par T°max ECS : au-delà, c'est l'appoint électrique (zone 3) qui
+# doit prendre le relais. Déduit des captures : à 49,6 °C (consigne 55,
+# hystérésis 5) la production tournait, à 50,2 °C elle était arrêtée.
+P_ECS_TMAX_PAC = 76       # « T°max ECS » (55 sur une Mistral Compact)
+P_ECS_HYSTERESIS = 32     # « hysteresis ECS » (5)
 
 # Sortie « circulateur zone n » = O@(100 + 10*n)
 def heating_zone_circulator(zone_id: int) -> int:

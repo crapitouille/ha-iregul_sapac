@@ -23,7 +23,7 @@ from .api import (
     IRegulUnknownSerialError,
     PointKey,
 )
-from .const import DOMAIN, MANUFACTURER
+from .const import DOMAIN, MANUFACTURER, MAX_BACKOFF_FACTOR, TOLERATED_FAILURES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -114,6 +114,25 @@ class IRegulCoordinator(DataUpdateCoordinator[IRegulData]):
         self.client = client
         self._meta: IRegulFrame | None = None
         self._started = False
+        self._base_interval = scan_interval
+        self._failures = 0
+
+    @property
+    def consecutive_failures(self) -> int:
+        """Nombre d'échecs de lecture consécutifs (0 si tout va bien)."""
+        return self._failures
+
+    def _note_failure(self) -> None:
+        """Compte l'échec et espace la prochaine interrogation."""
+        self._failures += 1
+        factor = min(2 ** (self._failures - 1), MAX_BACKOFF_FACTOR)
+        self.update_interval = timedelta(seconds=self._base_interval * factor)
+
+    def _note_success(self) -> None:
+        """Rétablit la cadence nominale."""
+        if self._failures:
+            self._failures = 0
+            self.update_interval = timedelta(seconds=self._base_interval)
 
     async def _async_setup(self) -> None:
         """Découverte initiale (commande 502) — libellés, unités, bornes."""
@@ -148,9 +167,24 @@ class IRegulCoordinator(DataUpdateCoordinator[IRegulData]):
         except (IRegulAuthError, IRegulUnknownSerialError) as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except IRegulConnectionError as err:
+            self._note_failure()
+            # Le serveur i-regul a des absences passagères. Plutôt que de faire
+            # clignoter toutes les entités, on garde les dernières valeurs
+            # connues quelques cycles — puis on admet l'indisponibilité.
+            if self._failures <= TOLERATED_FAILURES and self.data is not None:
+                _LOGGER.warning(
+                    "i-regul %s : %s — échec %d/%d, les dernières valeurs "
+                    "connues sont conservées",
+                    self.client.serial,
+                    err,
+                    self._failures,
+                    TOLERATED_FAILURES + 1,
+                )
+                return self.data
             raise UpdateFailed(str(err)) from err
         finally:
             self._started = True
+        self._note_success()
         if status.stale:
             _LOGGER.warning(
                 "i-regul %s : le serveur renvoie de vieilles données (régulateur hors ligne ?)",
